@@ -49,10 +49,13 @@
 - static encoder
 - runtime encoder
 - FastEmbed runtime factory
+- optional HTTP embedding / reranker adapters
 
 輸出包括：
 - dense vector
 - sparse vector
+
+預設 live path 仍是 FastEmbed dense+sparse runtime。若需要接本地服務，可透過 `.env.example` 中的 `RAG_EMBEDDING_PROVIDER=openai_compatible` 與 `RAG_RERANKER_PROVIDER=http_qwen` 啟用 optional adapter path，而不改動現有 retrieval core contract。
 
 ### D. Storage / Qdrant Layer
 負責將 chunk 與其 payload 寫入 Qdrant，並支援 dense/sparse retrieval。
@@ -102,7 +105,7 @@
 - `live_smoke.py`：retrieval smoke payload / helper
 
 ### Agno Runtime Wiring
-- `agno_backend_factory.py`：從 env/config 讀取最小 live wiring，建立 Qdrant + runtime-backed retriever backend
+- `agno_backend_factory.py`：從 env/config 讀取最小 live wiring，建立 Qdrant + runtime-backed retriever backend，並暴露 optional embedding/reranker 設定解析 helper
 - `agno_runtime.py`：建立 Agno tools 與 specialist agent
 - `agno_live_smoke.py`：最小 backend → agent → response smoke 路徑
 - `scripts/run_agno_specialist.py`：CLI entrypoint；缺設定時應明確失敗，設定齊全時可走最小 runnable path
@@ -111,6 +114,7 @@
 - `query_encoders.py`：`BaseQueryEncoder`, `StaticQueryEncoder`, `RuntimeQueryEncoder`
 - `document_encoders.py`：`BaseDocumentEncoder`, `StaticDocumentEncoder`, `RuntimeDocumentEncoder`
 - `fastembed_adapters.py`：FastEmbed config / runtime factory / runtime wrapper
+- `http_embedding_adapter.py`：可選 OpenAI-compatible `/v1/embeddings` adapter，適合本地 Qwen embedding service
 - `sparse_vectors.py`：sparse vector shape helper
 
 ### Qdrant Integration
@@ -124,7 +128,8 @@
 - `pre_retrieval.py`：rewrite / multi-query
 - `retrieval_fusion.py`：RRF fusion
 - `retrieval_filters.py`：latest-active filter / history mode
-- `rerank.py`：rerank abstraction
+- `rerank.py`：rerank abstraction + optional reranker env selection
+- `http_reranker.py`：可選 Qwen-style `/score` reranker adapter
 - `citation_utils.py`：citation 組裝
 - `retriever_schemas.py`：request/response schema
 - `retriever_core.py`：retrieve pipeline 核心

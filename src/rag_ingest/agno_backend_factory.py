@@ -13,6 +13,17 @@ def _required_setting(name):
     return None
 
 
+def resolve_backend_options_from_env():
+    return {
+        'embedding_provider': os.environ.get('RAG_EMBEDDING_PROVIDER', 'fastembed'),
+        'embedding_base_url': os.environ.get('RAG_EMBEDDING_BASE_URL'),
+        'embedding_model': os.environ.get('RAG_EMBEDDING_MODEL'),
+        'reranker_provider': os.environ.get('RAG_RERANKER_PROVIDER', 'none'),
+        'reranker_base_url': os.environ.get('RAG_RERANKER_BASE_URL'),
+        'reranker_model': os.environ.get('RAG_RERANKER_MODEL'),
+    }
+
+
 def _default_backend_builder(
     *,
     qdrant_url,

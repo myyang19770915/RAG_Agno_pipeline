@@ -48,6 +48,7 @@ flowchart TD
     B --> C[Pre-retrieval]
     C --> D[rewrite / multi-query / normalization]
     D --> E[RuntimeQueryEncoder / StaticQueryEncoder]
+    D -. optional .-> E1[HttpEmbeddingAdapter]
     E --> F[EncodedQuery dense+sparse]
     F --> G[Qdrant dense search]
     F --> H[Qdrant sparse search]
@@ -55,6 +56,7 @@ flowchart TD
     H --> I
     I --> J[latest-active filter]
     J --> K[Rerank]
+    K -. optional .-> K1[HttpQwenReranker /score]
     K --> L[Format citation + RetrieveResult]
     L --> M[RetrieveResponse]
     M --> N[retrieve_tool / Agent Adapter]

@@ -1,6 +1,8 @@
 import hashlib
 import os
 
+from rag_ingest.http_embedding_adapter import HttpEmbeddingAdapter
+
 
 class DeterministicEmbeddingProvider(object):
     name = 'deterministic-local'
@@ -38,6 +40,14 @@ class OpenAICompatibleEmbeddingProvider(object):
 
 
 def select_embedding_provider():
+    provider_name = os.environ.get('RAG_EMBEDDING_PROVIDER')
+    if provider_name == 'openai_compatible':
+        return HttpEmbeddingAdapter(
+            base_url=os.environ.get('RAG_EMBEDDING_BASE_URL', os.environ.get('OPENAI_BASE_URL', 'http://127.0.0.1:8000')),
+            model=os.environ.get('RAG_EMBEDDING_MODEL', os.environ.get('EMBEDDING_MODEL', 'text-embedding-3-small')),
+            api_key=os.environ.get('OPENAI_API_KEY') or None,
+        )
+
     api_key = os.environ.get('OPENAI_API_KEY')
     if api_key:
         return OpenAICompatibleEmbeddingProvider(

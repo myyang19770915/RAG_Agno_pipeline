@@ -1,6 +1,6 @@
 import pytest
 
-from rag_ingest.agno_backend_factory import create_backend_from_env
+from rag_ingest.agno_backend_factory import create_backend_from_env, resolve_backend_options_from_env
 
 
 class FakeBackend:
@@ -52,3 +52,23 @@ def test_create_backend_from_env_delegates_to_injected_builder(monkeypatch):
             'threads': 4,
         }
     ]
+
+
+def test_resolve_backend_options_from_env_exposes_optional_embedding_and_reranker_settings(monkeypatch):
+    monkeypatch.setenv('RAG_EMBEDDING_PROVIDER', 'openai_compatible')
+    monkeypatch.setenv('RAG_EMBEDDING_BASE_URL', 'http://localhost:8000')
+    monkeypatch.setenv('RAG_EMBEDDING_MODEL', 'Qwen/Qwen3-Embedding-0.6B')
+    monkeypatch.setenv('RAG_RERANKER_PROVIDER', 'http_qwen')
+    monkeypatch.setenv('RAG_RERANKER_BASE_URL', 'http://localhost:8090')
+    monkeypatch.setenv('RAG_RERANKER_MODEL', 'Qwen3-Reranker-0.6B')
+
+    options = resolve_backend_options_from_env()
+
+    assert options == {
+        'embedding_provider': 'openai_compatible',
+        'embedding_base_url': 'http://localhost:8000',
+        'embedding_model': 'Qwen/Qwen3-Embedding-0.6B',
+        'reranker_provider': 'http_qwen',
+        'reranker_base_url': 'http://localhost:8090',
+        'reranker_model': 'Qwen3-Reranker-0.6B',
+    }

@@ -10,6 +10,7 @@
 - citation 可追蹤
 - 可被 agent 直接調用的穩定 contract
 - 可落地到 Qdrant + FastEmbed 的 live path
+- 可選接本地 Qwen embedding / reranker HTTP 服務
 
 ---
 
@@ -128,6 +129,12 @@ src/rag_ingest/
 - 可用的 LLM provider（例如 OpenAI）
 
 ### 最小環境變數
+建議先複製安全範本：
+```bash
+cp .env.example .env
+```
+
+最小必要變數如下：
 ```bash
 export RAG_QDRANT_URL=http://127.0.0.1:6333
 export RAG_QDRANT_COLLECTION=documents_live_hybrid_smoke
@@ -153,6 +160,7 @@ PYTHONPATH=src:. python3 scripts/run_agno_specialist.py "what is this document a
 
 ### 安全提醒
 - **不要把 `.env`、API keys、token.json、憑證檔提交到 Git**
+- 請使用 `.env.example` 當成可提交的安全模板，真正 secrets 只放本機 `.env` 或 CI secret store
 - 本 repo 已加入 `.gitignore` 來避免常見機密與快取檔案被提交
 
 ---
@@ -249,6 +257,12 @@ Document encoder 對外統一：
 `FastEmbedRuntime` 提供：
 - `encode_chunks(chunks)`
 - `encode_query(text)`
+
+### 預設與可選 embedding / reranker 路徑
+- **預設路徑**：`FastEmbedRuntimeFactory` + `RuntimeQueryEncoder`，使用 `RAG_DENSE_MODEL` / `RAG_SPARSE_MODEL`
+- **可選 embedding 路徑**：`RAG_EMBEDDING_PROVIDER=openai_compatible` 時，可改走 `HttpEmbeddingAdapter`，對本地 OpenAI-compatible `/v1/embeddings` 服務送出 `{model, input:[...]}`
+- **可選 reranker 路徑**：`RAG_RERANKER_PROVIDER=http_qwen` 時，可透過 `HttpQwenReranker` 對 `/score` 服務送出 `{model, query, documents:[...]}`
+- 這兩條 optional path 目前是**整合 adapter / wiring helper**，不會改變既有 FastEmbed + Qdrant 預設檢索核心
 
 ---
 
@@ -406,6 +420,12 @@ response = retrieve_tool(request, backend=backend)
 pytest -q
 ```
 
+### GitHub Actions
+Repo 已加入 `.github/workflows/tests.yml`：
+- Python 3.11
+- 安裝保守的測試依賴
+- 執行 adapter / wiring / retriever backend 相關 pytest 子集合
+
 或只跑 retriever / hybrid 相關：
 ```bash
 pytest tests/rag_ingest/test_retriever_schemas.py \
@@ -441,7 +461,11 @@ pytest tests/rag_ingest/test_retriever_schemas.py \
 - 透過 `agno_backend_factory.py` 從環境變數讀取最小 runtime wiring（Qdrant URL / collection / dense model / sparse model）
 - 透過 `agno_live_smoke.py` 提供最小 backend → agent → response runnable path，方便在真實依賴存在時做 smoke 驗證
 
-## 14. 目前狀態
+## 14. License
+
+本專案採用 **MIT License**，完整條文請見 `LICENSE`。
+
+## 15. 目前狀態
 
 目前已完成：
 - version-aware ingestion

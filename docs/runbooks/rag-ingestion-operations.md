@@ -28,6 +28,7 @@ Retriever keeps the same external contract, but backend retrieval may use Qdrant
 - query encoders produce dense+sparse query forms
 - document encoders produce dense+sparse chunk vectors for ingestion
 - FastEmbed should live in the adapter layer, not in retriever core business logic
+- optional local services may be wired through `HttpEmbeddingAdapter` (`/v1/embeddings`) and `HttpQwenReranker` (`/score`) without changing the default FastEmbed path
 
 ## live search path
 A live Qdrant backend should:
@@ -44,6 +45,11 @@ A runtime-backed smoke path should prove:
 - version-aware ingest -> retriever backend -> tool output
 
 This smoke path is useful for validating architecture wiring before depending on a real FastEmbed/Qdrant environment in production.
+
+## repository hygiene
+- `LICENSE` ships the project under MIT terms.
+- `.env.example` documents safe, non-secret configuration defaults.
+- `.github/workflows/tests.yml` runs a Python 3.11 pytest subset in CI.
 
 ## nightly cleanup
 Run daily during off-peak hours. Delete Qdrant points for superseded inactive versions older than retention.

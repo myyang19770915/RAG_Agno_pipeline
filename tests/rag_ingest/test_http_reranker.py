@@ -44,6 +44,33 @@ def test_http_qwen_reranker_posts_score_payload_and_sorts_candidates():
     }
 
 
+def test_http_qwen_reranker_supports_duplicate_document_texts():
+    transport = RecordingTransport(
+        response_payload={
+            'data': [
+                {'score': 0.2},
+                {'score': 0.8},
+            ]
+        }
+    )
+    reranker = HttpQwenReranker(
+        base_url='http://localhost:8090',
+        model='rerank-model',
+        transport=transport,
+    )
+
+    reranked = reranker.rerank(
+        'query',
+        [
+            {'chunk_id': 'a', 'text': 'duplicate'},
+            {'chunk_id': 'b', 'text': 'duplicate'},
+        ],
+    )
+
+    assert [item['chunk_id'] for item in reranked] == ['b', 'a']
+    assert [item['rerank_score'] for item in reranked] == [0.8, 0.2]
+
+
 def test_http_qwen_reranker_raises_when_scores_do_not_match_documents():
     transport = RecordingTransport(response_payload={'data': [{'score': 0.5}]})
     reranker = HttpQwenReranker(

@@ -40,6 +40,26 @@ def test_http_embedding_adapter_posts_openai_compatible_payload():
     }
 
 
+def test_http_embedding_adapter_orders_embeddings_by_response_index():
+    transport = RecordingTransport(
+        response_payload={
+            'data': [
+                {'index': 1, 'embedding': [0.3, 0.4]},
+                {'index': 0, 'embedding': [0.1, 0.2]},
+            ]
+        }
+    )
+    adapter = HttpEmbeddingAdapter(
+        base_url='http://localhost:8000/',
+        model='Qwen/Qwen3-Embedding-0.6B',
+        transport=transport,
+    )
+
+    result = adapter.embed_texts(['hello', 'world'])
+
+    assert result == [[0.1, 0.2], [0.3, 0.4]]
+
+
 def test_http_embedding_adapter_raises_for_missing_data_items():
     transport = RecordingTransport(response_payload={'data': [{}]})
     adapter = HttpEmbeddingAdapter(

@@ -13,21 +13,31 @@ class HttpEmbeddingAdapter(object):
         self._transport = transport or self._default_transport
 
     def embed_texts(self, texts):
+        inputs = list(texts)
         response = self._post_json(
             'v1/embeddings',
             {
                 'model': self.model,
-                'input': list(texts),
+                'input': inputs,
             },
         )
         data = response.get('data') or []
-        vectors = []
-        for item in data:
+        if len(data) != len(inputs):
+            raise RuntimeError('embedding response did not match requested inputs')
+
+        indexed_vectors = [None] * len(inputs)
+        for position, item in enumerate(data):
             embedding = item.get('embedding')
             if embedding is None:
                 raise RuntimeError('embedding response item missing embedding field')
-            vectors.append(embedding)
-        return vectors
+            index = item.get('index', position)
+            if not isinstance(index, int) or index < 0 or index >= len(inputs):
+                raise RuntimeError('embedding response item had invalid index')
+            indexed_vectors[index] = embedding
+
+        if any(vector is None for vector in indexed_vectors):
+            raise RuntimeError('embedding response did not match requested inputs')
+        return indexed_vectors
 
     def _post_json(self, path, payload):
         headers = {'Content-Type': 'application/json'}

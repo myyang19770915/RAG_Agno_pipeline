@@ -22,12 +22,11 @@ class HttpQwenReranker(object):
                 'documents': documents,
             },
         )
-        scores_by_document = self._extract_scores(response, documents)
+        scores = self._extract_scores(response, documents)
         reranked = []
-        for candidate in candidates:
-            document = candidate.get('text', '')
+        for index, candidate in enumerate(candidates):
             updated = dict(candidate)
-            updated['rerank_score'] = scores_by_document[document]
+            updated['rerank_score'] = scores[index]
             reranked.append(updated)
         return sorted(reranked, key=lambda item: item['rerank_score'], reverse=True)
 
@@ -35,15 +34,29 @@ class HttpQwenReranker(object):
         data = response.get('data')
         if not isinstance(data, list) or len(data) != len(documents):
             raise RuntimeError('reranker response did not match requested documents')
-        scores = {}
-        for document, item in zip(documents, data):
+
+        requested_are_unique = len(set(documents)) == len(documents)
+        response_has_documents = all('document' in item for item in data)
+        if requested_are_unique and response_has_documents:
+            scores_by_document = {}
+            for item in data:
+                score = item.get('score')
+                document = item.get('document')
+                if score is None:
+                    raise RuntimeError('reranker response item missing score field')
+                if document not in documents:
+                    raise RuntimeError('reranker response did not match requested documents')
+                scores_by_document[document] = score
+            if len(scores_by_document) != len(documents):
+                raise RuntimeError('reranker response did not match requested documents')
+            return [scores_by_document[document] for document in documents]
+
+        scores = []
+        for item in data:
             score = item.get('score')
             if score is None:
                 raise RuntimeError('reranker response item missing score field')
-            response_document = item.get('document', document)
-            scores[response_document] = score
-        if len(scores) != len(documents):
-            raise RuntimeError('reranker response did not match requested documents')
+            scores.append(score)
         return scores
 
     def _post_json(self, path, payload):

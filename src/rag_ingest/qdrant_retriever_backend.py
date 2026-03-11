@@ -1,4 +1,5 @@
 from rag_ingest.qdrant_filters import latest_active_filter
+from rag_ingest.rerank import rerank_candidates
 
 
 def build_dense_query_args(vector, limit, query_filter=None):
@@ -38,10 +39,11 @@ def normalize_qdrant_result(hit):
 
 
 class QdrantRetrieverBackend(object):
-    def __init__(self, client, collection_name='documents', query_encoder=None):
+    def __init__(self, client, collection_name='documents', query_encoder=None, reranker=None):
         self.client = client
         self.collection_name = collection_name
         self.query_encoder = query_encoder
+        self.reranker = reranker
 
     def _encode_query(self, query):
         if self.query_encoder is None:
@@ -95,6 +97,11 @@ class QdrantRetrieverBackend(object):
 
         hits = self._search_points(**build_sparse_query_args(encoded.sparse, limit))
         return [normalize_qdrant_result(hit) for hit in hits]
+
+    def rerank(self, query, candidates):
+        if self.reranker is None:
+            return rerank_candidates(query, candidates, strategy='lightweight')
+        return self.reranker.rerank(query, candidates)
 
     def hybrid_search(self, query, limit):
         vector_results = self.vector_search(query, limit)

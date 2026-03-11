@@ -31,11 +31,14 @@ def retrieve(
         history_mode=history_mode,
         extra_filters=filters,
     )
-    reranked_candidates = rerank_candidates(
-        prepared.applied_query,
-        filtered_candidates,
-        strategy='lightweight',
-    )
+    if hasattr(backend, 'rerank'):
+        reranked_candidates = backend.rerank(prepared.applied_query, filtered_candidates)
+    else:
+        reranked_candidates = rerank_candidates(
+            prepared.applied_query,
+            filtered_candidates,
+            strategy='lightweight',
+        )
 
     results = [
         format_retrieve_result(

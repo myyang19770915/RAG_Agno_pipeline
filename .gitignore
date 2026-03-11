@@ -1,2 +1,19 @@
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
 
-.worktrees/
+# Env / secrets
+.env
+.env.*
+*.env
+
+# Local model/cache
+cache/
+.fastembed/
+*.onnx
+
+# OS / editor
+.DS_Store
+.vscode/
+.idea/

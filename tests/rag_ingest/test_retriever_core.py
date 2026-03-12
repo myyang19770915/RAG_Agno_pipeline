@@ -67,3 +67,17 @@ def test_retrieve_uses_backend_reranker_when_available_and_keeps_result_shape():
     assert response.results[0].chunk_id == 'a'
     assert response.results[0].document_key == 'doc1'
     assert hasattr(response.results[0], 'citation')
+
+
+def test_retrieve_include_debug_returns_stable_candidate_counts():
+    response = retrieve('reset password', backend=FakeBackend(), top_k=2, include_debug=True)
+
+    assert response.debug == {
+        'rewrite_strategy': 'none',
+        'retrieval_summary': {
+            'vector_candidates': 2,
+            'keyword_candidates': 1,
+            'fused_candidates': 2,
+            'reranked_candidates': 1,
+        },
+    }

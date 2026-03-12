@@ -56,12 +56,11 @@ def retrieve(
     if include_debug:
         debug = {
             'rewrite_strategy': prepared.rewrite_strategy,
-            'candidate_counts': {
-                'vector': len(vector_candidates),
-                'keyword': len(keyword_candidates),
-                'fused': len(fused_candidates),
-                'filtered': len(filtered_candidates),
-                'reranked': len(reranked_candidates),
+            'retrieval_summary': {
+                'vector_candidates': len(vector_candidates),
+                'keyword_candidates': len(keyword_candidates),
+                'fused_candidates': len(fused_candidates),
+                'reranked_candidates': len(reranked_candidates),
             },
         }
 

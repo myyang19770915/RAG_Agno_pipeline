@@ -1,15 +1,17 @@
 import json
 from urllib import request
+from urllib.error import HTTPError, URLError
 from urllib.parse import urljoin
 
 
 class HttpEmbeddingAdapter(object):
     name = 'http-openai-compatible'
 
-    def __init__(self, base_url, model, transport=None, api_key=None):
+    def __init__(self, base_url, model, transport=None, api_key=None, timeout_seconds=10):
         self.base_url = base_url.rstrip('/')
         self.model = model
         self.api_key = api_key
+        self.timeout_seconds = timeout_seconds
         self._transport = transport or self._default_transport
 
     def embed_texts(self, texts):
@@ -47,8 +49,16 @@ class HttpEmbeddingAdapter(object):
             'url': urljoin(self.base_url + '/', path),
             'headers': headers,
             'body': payload,
+            'timeout': self.timeout_seconds,
         }
-        status, body = self._transport(http_request)
+        try:
+            status, body = self._transport(http_request)
+        except HTTPError as exc:
+            raise RuntimeError('embedding request failed with status %s' % exc.code)
+        except URLError as exc:
+            raise RuntimeError('embedding request failed: %s' % exc.reason)
+        except Exception as exc:
+            raise RuntimeError('embedding request failed: %s' % exc)
         if status >= 400:
             raise RuntimeError('embedding request failed with status %s' % status)
         return json.loads(body.decode('utf-8'))
@@ -60,5 +70,5 @@ class HttpEmbeddingAdapter(object):
             headers=http_request['headers'],
             method='POST',
         )
-        with request.urlopen(raw_request) as response:
+        with request.urlopen(raw_request, timeout=http_request['timeout']) as response:
             return response.status, response.read()

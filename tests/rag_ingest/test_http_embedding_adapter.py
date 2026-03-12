@@ -1,4 +1,6 @@
 import json
+from urllib.error import URLError
+
 import pytest
 
 from rag_ingest.http_embedding_adapter import HttpEmbeddingAdapter
@@ -69,4 +71,33 @@ def test_http_embedding_adapter_raises_for_missing_data_items():
     )
 
     with pytest.raises(RuntimeError, match='embedding'):
+        adapter.embed_texts(['hello'])
+
+
+def test_http_embedding_adapter_includes_timeout_in_transport_request():
+    transport = RecordingTransport(response_payload={'data': [{'embedding': [0.1, 0.2]}]})
+    adapter = HttpEmbeddingAdapter(
+        base_url='http://localhost:8000',
+        model='embed-model',
+        transport=transport,
+        timeout_seconds=12.5,
+    )
+
+    adapter.embed_texts(['hello'])
+
+    assert transport.calls[0]['timeout'] == 12.5
+
+
+def test_http_embedding_adapter_raises_clear_timeout_error():
+    def failing_transport(request):
+        raise URLError('timed out')
+
+    adapter = HttpEmbeddingAdapter(
+        base_url='http://localhost:8000',
+        model='embed-model',
+        transport=failing_transport,
+        timeout_seconds=3,
+    )
+
+    with pytest.raises(RuntimeError, match='embedding request failed'):
         adapter.embed_texts(['hello'])

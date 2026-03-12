@@ -122,19 +122,19 @@ src/rag_ingest/
 
 ### 需求
 - Python 3.11+
-- Qdrant
-- `fastembed`
-- `qdrant_client`
-- `agno`
-- 可用的 LLM provider（例如 OpenAI）
+- Qdrant（本機或 LAN）
+- `pytest`
+- `qdrant-client`
+- `fastembed`（走預設 FastEmbed 路徑時需要）
+- `agno` + 可用的 LLM provider（跑 Agno specialist smoke 時需要）
 
-### 最小環境變數
-建議先複製安全範本：
+### 1. 本機 setup
+先複製安全範本：
 ```bash
 cp .env.example .env
 ```
 
-最小必要變數如下：
+最小本機 FastEmbed 路徑：
 ```bash
 export RAG_QDRANT_URL=http://127.0.0.1:6333
 export RAG_QDRANT_COLLECTION=documents_live_hybrid_smoke
@@ -144,19 +144,58 @@ export AGNO_MODEL=openai:gpt-5-mini
 export OPENAI_API_KEY=your_key_here
 ```
 
-### 執行 Agno specialist live smoke
+### 2. Quick smoke（不依賴 LAN embedding / reranker）
+先跑穩定測試子集合：
+```bash
+PYTHONPATH=src pytest -q \
+  tests/rag_ingest/test_http_embedding_adapter.py \
+  tests/rag_ingest/test_http_reranker.py \
+  tests/rag_ingest/test_embedding_provider.py \
+  tests/rag_ingest/test_rerank.py \
+  tests/rag_ingest/test_agno_backend_factory.py \
+  tests/rag_ingest/test_citation_utils.py \
+  tests/rag_ingest/test_pre_retrieval.py \
+  tests/rag_ingest/test_retrieval_filters.py \
+  tests/rag_ingest/test_retrieval_fusion.py \
+  tests/rag_ingest/test_retriever_schemas.py \
+  tests/rag_ingest/test_retriever_core.py \
+  tests/rag_ingest/test_retriever_tool.py
+```
+
+接著可跑 Agno specialist smoke：
 ```bash
 PYTHONPATH=src:. python3 scripts/run_agno_specialist.py "what is this document about?"
 ```
 
-### 預期行為
-- 若缺少必要 RAG env，程式會明確報錯
-- 若 Agno model/provider 未配置，會在 agent runtime 階段報錯
-- 若環境完整，會走：
-  - backend factory
-  - Agno tool registration
-  - retrieval tool
-  - LLM answer generation
+### 3. LAN embedding / reranker 路徑
+如果 dense embedding 改由 OpenAI-compatible HTTP 服務提供：
+```bash
+export RAG_EMBEDDING_PROVIDER=openai_compatible
+export RAG_EMBEDDING_BASE_URL=http://192.168.1.10:8000
+export RAG_EMBEDDING_MODEL=Qwen/Qwen3-Embedding-0.6B
+export RAG_EMBEDDING_TIMEOUT_SECONDS=10
+```
+
+如果要接 Qwen reranker HTTP 服務：
+```bash
+export RAG_RERANKER_PROVIDER=http_qwen
+export RAG_RERANKER_BASE_URL=http://192.168.1.10:8090
+export RAG_RERANKER_MODEL=Qwen/Qwen3-Reranker-0.6B
+export RAG_RERANKER_TIMEOUT_SECONDS=10
+```
+
+目前 fallback / timeout 行為：
+- HTTP embedding 與 HTTP reranker 都會帶明確 timeout
+- HTTP request 失敗時會丟出清楚的 `RuntimeError`
+- `RAG_RERANKER_PROVIDER=none` 時，維持既有 lightweight rerank fallback
+- 若 `http_qwen` reranker 在建構階段失敗，backend wiring 會退回 lightweight rerank，而不是讓整個 backend 初始化失敗
+
+### 4. 基本 troubleshooting
+- 缺少必要 RAG env：`create_backend_from_env(...)` 會明確列出缺的變數
+- HTTP embedding timeout / 連線錯誤：確認 `RAG_EMBEDDING_BASE_URL`、模型名、服務是否真的提供 `/v1/embeddings`
+- HTTP reranker timeout / 連線錯誤：確認 `RAG_RERANKER_BASE_URL`、模型名、服務是否真的提供 `/score`
+- 想先排除外部服務因素：把 `RAG_EMBEDDING_PROVIDER=fastembed`、`RAG_RERANKER_PROVIDER=none`
+- FastEmbed cache/threads 調校：使用 `RAG_FASTEMBED_CACHE_DIR`、`RAG_FASTEMBED_THREADS`
 
 ### 安全提醒
 - **不要把 `.env`、API keys、token.json、憑證檔提交到 Git**
@@ -421,17 +460,27 @@ pytest -q
 ```
 
 ### GitHub Actions
-Repo 已加入 `.github/workflows/tests.yml`：
+Repo 包含 `.github/workflows/tests.yml`：
 - Python 3.11
-- 安裝保守的測試依賴
-- 執行 adapter / wiring / retriever backend 相關 pytest 子集合
+- 只安裝穩定 CI 子集合需要的最小依賴（`pytest`、`qdrant-client`）
+- 避免預設 CI 依賴 LAN 服務、live secrets、或本機專用 runtime
+- 執行 adapter / wiring / retriever contract 的穩定 pytest 子集合
 
-或只跑 retriever / hybrid 相關：
+如果要在本機模擬 CI：
 ```bash
-pytest tests/rag_ingest/test_retriever_schemas.py \
-       tests/rag_ingest/test_retriever_core.py \
-       tests/rag_ingest/test_qdrant_retriever_backend.py \
-       tests/rag_ingest/test_live_hybrid_runner.py -v
+PYTHONPATH=src pytest -q \
+  tests/rag_ingest/test_http_embedding_adapter.py \
+  tests/rag_ingest/test_http_reranker.py \
+  tests/rag_ingest/test_embedding_provider.py \
+  tests/rag_ingest/test_rerank.py \
+  tests/rag_ingest/test_agno_backend_factory.py \
+  tests/rag_ingest/test_citation_utils.py \
+  tests/rag_ingest/test_pre_retrieval.py \
+  tests/rag_ingest/test_retrieval_filters.py \
+  tests/rag_ingest/test_retrieval_fusion.py \
+  tests/rag_ingest/test_retriever_schemas.py \
+  tests/rag_ingest/test_retriever_core.py \
+  tests/rag_ingest/test_retriever_tool.py
 ```
 
 ---

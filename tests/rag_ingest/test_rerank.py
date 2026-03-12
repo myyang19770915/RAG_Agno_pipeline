@@ -46,3 +46,16 @@ def test_select_reranker_from_env_returns_none_by_default(monkeypatch):
         monkeypatch.delenv(key, raising=False)
 
     assert select_reranker_from_env() is None
+
+
+def test_select_reranker_from_env_falls_back_to_none_when_http_reranker_construction_fails(monkeypatch):
+    class BrokenReranker(object):
+        def __init__(self, *args, **kwargs):
+            raise RuntimeError('boom')
+
+    monkeypatch.setenv('RAG_RERANKER_PROVIDER', 'http_qwen')
+    monkeypatch.setenv('RAG_RERANKER_BASE_URL', 'http://localhost:8090')
+    monkeypatch.setenv('RAG_RERANKER_MODEL', 'Qwen3-Reranker-0.6B')
+    monkeypatch.setattr('rag_ingest.rerank.HttpQwenReranker', BrokenReranker)
+
+    assert select_reranker_from_env() is None

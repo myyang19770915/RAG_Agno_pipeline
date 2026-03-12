@@ -1,4 +1,6 @@
 import json
+from urllib.error import URLError
+
 import pytest
 
 from rag_ingest.http_reranker import HttpQwenReranker
@@ -141,3 +143,32 @@ def test_http_qwen_reranker_raises_when_scores_do_not_match_documents():
                 {'chunk_id': 'b', 'text': 'second'},
             ],
         )
+
+
+def test_http_qwen_reranker_includes_timeout_in_transport_request():
+    transport = RecordingTransport(response_payload={'data': [{'score': 0.9}]})
+    reranker = HttpQwenReranker(
+        base_url='http://localhost:8090',
+        model='rerank-model',
+        transport=transport,
+        timeout_seconds=7,
+    )
+
+    reranker.rerank('query', [{'chunk_id': 'a', 'text': 'first'}])
+
+    assert transport.calls[0]['timeout'] == 7
+
+
+def test_http_qwen_reranker_raises_clear_timeout_error():
+    def failing_transport(request):
+        raise URLError('timed out')
+
+    reranker = HttpQwenReranker(
+        base_url='http://localhost:8090',
+        model='rerank-model',
+        transport=failing_transport,
+        timeout_seconds=4,
+    )
+
+    with pytest.raises(RuntimeError, match='reranker request failed'):
+        reranker.rerank('query', [{'chunk_id': 'a', 'text': 'first'}])

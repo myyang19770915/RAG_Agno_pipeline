@@ -4,6 +4,13 @@ import os
 from rag_ingest.http_embedding_adapter import HttpEmbeddingAdapter
 
 
+def _optional_timeout(name, default=10):
+    value = os.environ.get(name)
+    if value in (None, ''):
+        return default
+    return float(value)
+
+
 class DeterministicEmbeddingProvider(object):
     name = 'deterministic-local'
 
@@ -46,6 +53,7 @@ def select_embedding_provider():
             base_url=os.environ.get('RAG_EMBEDDING_BASE_URL', os.environ.get('OPENAI_BASE_URL', 'http://127.0.0.1:8000')),
             model=os.environ.get('RAG_EMBEDDING_MODEL', os.environ.get('EMBEDDING_MODEL', 'text-embedding-3-small')),
             api_key=os.environ.get('OPENAI_API_KEY') or None,
+            timeout_seconds=_optional_timeout('RAG_EMBEDDING_TIMEOUT_SECONDS'),
         )
 
     api_key = os.environ.get('OPENAI_API_KEY')

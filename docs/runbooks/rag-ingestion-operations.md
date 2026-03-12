@@ -57,9 +57,9 @@ PYTHONPATH=src:. python3 scripts/run_agno_specialist.py "what is this document a
 
 如果要先驗證 ingestion CLI contract：
 ```bash
-PYTHONPATH=src:. python3 scripts/ingest_documents.py \
-  --source-path /data/docs \
-  --source-system local-folder
+PYTHONPATH=src:. python3 scripts/ingest_documents.py validate --source-path /data/docs
+PYTHONPATH=src:. python3 scripts/ingest_documents.py ingest --source-path /data/docs --db-path /tmp/rag-ingest.db
+PYTHONPATH=src:. python3 scripts/ingest_documents.py smoke --source-path /data/docs
 ```
 
 CLI 也支援從 env 載入預設值，方便 smoke / cron / batch job：
@@ -67,41 +67,64 @@ CLI 也支援從 env 載入預設值，方便 smoke / cron / batch job：
 export RAG_SOURCE_SYSTEM=local-folder
 export RAG_CHUNK_SIZE=500
 export RAG_CHUNK_OVERLAP=50
-PYTHONPATH=src:. python3 scripts/ingest_documents.py --source-path /data/docs
+export RAG_SQLITE_DB_PATH=/tmp/rag-ingest.db
+export RAG_INGEST_RUNNER=local_folder
+PYTHONPATH=src:. python3 scripts/ingest_documents.py ingest --source-path /data/docs
 ```
 
 有效設定規則：
 - `--source-system` 未提供時，讀 `RAG_SOURCE_SYSTEM`
 - `--chunk-size` 未提供時，讀 `RAG_CHUNK_SIZE`，否則回退 `500`
 - `--chunk-overlap` 未提供時，讀 `RAG_CHUNK_OVERLAP`，否則回退 `50`
+- `--db-path` 未提供時，讀 `RAG_SQLITE_DB_PATH`
+- 未指定 subcommand 時，預設等同 `ingest`
 
-完成 wiring 後，預期輸出 stable JSON summary，至少包含：
-- `config.source_path`
-- `config.source_system`
-- `config.chunk_size`
-- `config.chunk_overlap`
-- `preflight.source_path`
-- `preflight.source_system`
-- runner 回傳的 ingestion 結果欄位，例如 `documents_indexed`
+CLI 三種模式：
+- `validate`：只做 preflight，回傳 `supported_files` / `source_exists` / `runner`
+- `ingest`：可用注入 runner，或使用內建 `local_folder` runner（SQLite + FakeQdrant summary）
+- `smoke`：回傳固定 JSON smoke summary，適合 CI / shell pipeline / operator 檢查
 
-`preflight` 區塊的用途是先確認 effective config 與輸入來源，再進入真正 ingestion。這讓 CLI 更適合 shell pipeline、job runner、或 smoke 測試比對。
+穩定輸出 shape 至少包含：
+- `command`
+- `status`
+- `config.*`
+- `preflight.*`
+- `timing.elapsed_ms`
+- `event`
 
-目前這個 CLI 預設仍是 stub wiring；若未接上實際 runner，會明確報錯 `ingest_documents CLI wiring is not complete yet...`。預期行為是 fail-fast，不是吞錯或假裝完成，因此可把這個錯誤視為 preflight / wiring 未完成的訊號。
+`ingest` 模式常見 summary 欄位：
+- `summary.documents_indexed`
+- `summary.qdrant_points`
+- `summary.embedding_provider`
+- `summary.db_path`
+
+`preflight` 區塊的用途是先確認 effective config、來源是否存在、可掃描檔案數、與目前 runner，再進入真正 ingest。這讓 CLI 更適合 shell pipeline、job runner、或 smoke 測試比對。
+
+若缺少 runtime 依賴，CLI 會 fail-fast 並給清楚訊息，例如：
+- `Missing runtime dependency for ingest_documents CLI: qdrant_client`
+- `Local folder ingest requires --db-path or RAG_SQLITE_DB_PATH.`
 
 ## Retrieval debug / observability
 當你要排查 retrieval 品質或延遲時，可在 retrieval request / tool path 開 `include_debug=True`。
 
 目前 debug summary 的重點是穩定 shape，而不是完整 tracing，至少會帶：
-- vector candidates count
-- keyword candidates count
-- fused candidates count
-- reranked candidates count
-- `elapsed_ms`（整體 retrieval latency）
+- `retrieval_summary.vector_candidates`
+- `retrieval_summary.keyword_candidates`
+- `retrieval_summary.fused_candidates`
+- `retrieval_summary.reranked_candidates`
+- `retrieval_summary.elapsed_ms`
+- `timings.prepare_queries.elapsed_ms`
+- `timings.vector_search.elapsed_ms`
+- `timings.keyword_search.elapsed_ms`
+- `timings.fusion_filter_rerank.elapsed_ms`
+- `timings.total.elapsed_ms`
+- `event`（例如 `retrieval.completed`）
 
 建議：
 - smoke 驗證先關閉，保持輸出精簡
 - 排障或調參時再打開 `include_debug`
-- 若在 smoke 中看到 `elapsed_ms` 明顯飆升，先檢查外部 embedding / reranker 服務與 timeout 設定
+- 若在 smoke 中看到 `timings.vector_search.elapsed_ms` 或 `timings.keyword_search.elapsed_ms` 明顯飆升，先檢查外部 retrieval backend
+- 若 `timings.fusion_filter_rerank.elapsed_ms` 飆升，優先檢查 rerank / filter policy 與外部 reranker
 
 ## Policy defaults from env
 specialist / retrieval wiring 目前支援從 env 載入保守 policy：
@@ -110,6 +133,7 @@ export RAG_REWRITE_MODE=none
 export RAG_HISTORY_MODE=false
 export RAG_RERANKER_PROVIDER=none
 export RAG_EMBEDDING_PROVIDER=fastembed
+export RAG_RETRIEVAL_FALLBACK_MODE=lightweight
 ```
 
 safe defaults：
@@ -117,8 +141,9 @@ safe defaults：
 - `history_mode=false`
 - `rerank_provider=none`
 - `embedding_provider=fastembed`
+- `fallback_mode=lightweight`
 
-若值不合法，會自動回退到 safe defaults，而不是把未知 policy 直接帶進 live path。
+若值不合法，會自動回退到 safe defaults，而不是把未知 policy 直接帶進 live path。`load_policy_from_env()` 也會保留 requested value 與 fallback reason（`default` / `env` / `invalid`），方便 operator 快速看出目前是否真的吃到預期 policy。
 
 ## LAN embedding path
 若 dense embedding 由 LAN 上的 OpenAI-compatible 服務提供：

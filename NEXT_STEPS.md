@@ -17,12 +17,16 @@
 - LAN HTTP reranker service integration
 - live smoke 已跑通
 - GitHub repo 已建立並推送（workflow 檔暫未推）
+- ingestion CLI 已產品化為 `validate` / `ingest` / `smoke` 三種模式
+- CLI / retrieval 都有穩定 JSON summary 與 structured event shape
+- policy env 已支援 requested value + fallback reason 可觀測化
+- runbook / README 已補齊操作與排障說明
 
 目前尚未完全補齊：
 - CI workflow 正式上 GitHub
-- production-grade fallback / timeout 策略
-- 更完整的 deployment / operations 文件
-- 更成熟的 ingestion 入口與日常操作流程
+- production-grade cross-service fallback（例如 embedding timeout 自動切 FastEmbed）
+- 更進一步的 deployment / operations 自動化
+- 真正的 production Qdrant ingest runner / reindex command
 
 ---
 
@@ -128,9 +132,10 @@ README 應補強為：
 ## 2.1 正式 ingestion CLI / command
 
 ### 目前進度
-- 已有 `scripts/ingest_documents.py` 作為固定入口骨架
-- 已定義 JSON summary contract
-- 尚待接上真實 ingestion runner / reindex flow
+- `scripts/ingest_documents.py` 已提供 `validate` / `ingest` / `smoke`
+- 已定義穩定 JSON summary contract（含 `preflight` / `timing` / `event`）
+- 已有內建 `local_folder` runner（SQLite + FakeQdrant summary）可做本機 smoke / operator 驗證
+- 尚待補上真正 production Qdrant ingest runner / reindex flow
 
 ### 目的
 讓 ingest 不再只是 scattered scripts / smoke path，而是有固定入口。
@@ -149,9 +154,10 @@ README 應補強為：
 ## 2.2 Retrieval / rerank policy 明文化
 
 ### 目前進度
-- 已有 env-driven policy defaults：`RAG_REWRITE_MODE`、`RAG_HISTORY_MODE`、`RAG_RERANKER_PROVIDER`、`RAG_EMBEDDING_PROVIDER`
-- `scripts/run_agno_specialist.py` 已吃到這組 policy defaults
-- `include_debug` 已可提供候選數量摘要，方便觀察 policy 效果
+- 已有 env-driven policy defaults：`RAG_REWRITE_MODE`、`RAG_HISTORY_MODE`、`RAG_RERANKER_PROVIDER`、`RAG_EMBEDDING_PROVIDER`、`RAG_RETRIEVAL_FALLBACK_MODE`
+- `scripts/run_agno_specialist.py` 與 `agno_backend_factory.py` 都會吃到這組 policy defaults
+- policy loader 會保留 requested value 與 fallback reason（`default` / `env` / `invalid`）
+- `include_debug` 已可提供候選數量摘要與 stage timing，方便觀察 policy 效果
 
 ### 目的
 讓模型切換與排序策略可解釋、可調整。
@@ -171,8 +177,10 @@ README 應補強為：
 ## 2.3 Observability / logging
 
 ### 目前進度
-- 已有 `timed_call(...)` 這類 lightweight timing helper
+- 已有 `build_event(...)` / `timed_call(...)` / JSON event rendering 等 lightweight helper
 - retrieval path 已支援 `include_debug`，可回傳 vector / keyword / fused / reranked candidate counts
+- retrieval debug 也已提供 stage timing（prepare / vector / keyword / fusion+rerank / total）
+- ingestion CLI 三種模式都會輸出 structured event + elapsed time
 
 ### 目的
 讓未來 debug 與效能觀察更容易。

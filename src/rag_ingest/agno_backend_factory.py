@@ -1,6 +1,7 @@
 import os
 
 from rag_ingest.embedding_provider import select_embedding_provider
+from rag_ingest.policy_config import load_policy_from_env
 from rag_ingest.fastembed_adapters import FastEmbedAdapterConfig, FastEmbedRuntimeFactory
 from rag_ingest.qdrant_integration import QdrantClientFactory
 from rag_ingest.qdrant_retriever_backend import QdrantRetrieverBackend
@@ -16,13 +17,15 @@ def _required_setting(name):
 
 
 def resolve_backend_options_from_env():
+    policy = load_policy_from_env()
     return {
-        'embedding_provider': os.environ.get('RAG_EMBEDDING_PROVIDER', 'fastembed'),
+        'embedding_provider': policy['embedding_provider'],
         'embedding_base_url': os.environ.get('RAG_EMBEDDING_BASE_URL'),
         'embedding_model': os.environ.get('RAG_EMBEDDING_MODEL'),
-        'reranker_provider': os.environ.get('RAG_RERANKER_PROVIDER', 'none'),
+        'reranker_provider': policy['rerank_provider'],
         'reranker_base_url': os.environ.get('RAG_RERANKER_BASE_URL'),
         'reranker_model': os.environ.get('RAG_RERANKER_MODEL'),
+        'policy': policy,
     }
 
 

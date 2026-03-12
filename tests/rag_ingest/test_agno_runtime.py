@@ -82,6 +82,15 @@ def test_build_agno_tools_tolerates_missing_or_unknown_rewrite_mode_values():
     assert response_unknown['applied_query'] == 'reset password'
 
 
+def test_build_agno_tools_can_enable_debug_by_default_for_operator_runs():
+    tool = build_agno_tools(backend=FakeBackend(), default_include_debug=True)[0]
+
+    response = tool(query='reset password')
+
+    assert response['debug']['event']['event'] == 'retrieval.completed'
+    assert response['debug']['event']['operation'] == 'retrieve'
+
+
 def test_create_agno_specialist_agent_raises_clear_error_when_agno_unavailable(monkeypatch):
     real_import = builtins.__import__
 

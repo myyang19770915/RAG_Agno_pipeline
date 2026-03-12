@@ -168,44 +168,65 @@ PYTHONPATH=src:. python3 scripts/run_agno_specialist.py "what is this document a
 ```
 
 ### 2.1 Ingestion CLI contract
-目前 repo 也提供 `scripts/ingest_documents.py` 作為 ingestion CLI 入口骨架：
+`scripts/ingest_documents.py` 現在提供三個穩定模式：`validate` / `ingest` / `smoke`。
+
 ```bash
-PYTHONPATH=src:. python3 scripts/ingest_documents.py \
-  --source-path /data/docs \
-  --source-system local-folder
+PYTHONPATH=src:. python3 scripts/ingest_documents.py validate --source-path /data/docs
+PYTHONPATH=src:. python3 scripts/ingest_documents.py ingest --source-path /data/docs --db-path /tmp/rag-ingest.db
+PYTHONPATH=src:. python3 scripts/ingest_documents.py smoke --source-path /data/docs
 ```
 
-CLI 目前支援從 env 載入 smoke-friendly 預設值：
+若省略 subcommand，會維持 backward-compatible 預設，直接走 `ingest`。
+
+CLI 支援從 env 載入 smoke-friendly 預設值：
 ```bash
 export RAG_SOURCE_SYSTEM=local-folder
 export RAG_CHUNK_SIZE=500
 export RAG_CHUNK_OVERLAP=50
+export RAG_SQLITE_DB_PATH=/tmp/rag-ingest.db
+export RAG_INGEST_RUNNER=local_folder
 ```
 
-若 CLI 參數省略，會使用上述 env defaults；若 env 也未設定，`chunk_size` / `chunk_overlap` 仍會回退到 `500` / `50`。
+目前行為：
+- `validate`：只做 preflight，不執行 ingest
+- `ingest`：可使用注入 runner，或使用內建 `local_folder` runner（SQLite + FakeQdrant summary）
+- `smoke`：輸出固定 JSON smoke summary，適合 shell / CI / operator spot checks
 
-完成 wiring 後，CLI 會輸出 stable JSON summary，至少包含：
-- `config.source_path`
-- `config.source_system`
-- `config.chunk_size`
-- `config.chunk_overlap`
-- `preflight.source_path`
-- `preflight.source_system`
-- runner 回傳的 ingestion 結果欄位（例如 `documents_indexed`）
+所有模式都會輸出 stable JSON summary，固定包含：
+- `command`
+- `status`
+- `config.*`
+- `preflight.*`
+- `timing.elapsed_ms`
+- `event`（structured event）
 
-這個 `preflight` summary 是 smoke / shell script 友善的固定形狀，可先確認 effective config，再交由實際 runner 執行。
+`ingest` 模式的 summary 另外會包含：
+- `summary.documents_indexed`
+- `summary.qdrant_points`（若使用 local runner）
+- `summary.embedding_provider`
+- `summary.db_path`
 
-目前預設仍是安全 stub；若尚未注入實際 runner，CLI 會明確回報 wiring 尚未完成（`ingest_documents CLI wiring is not complete yet...`），而不是靜默成功或產生半套結果。
+這個 `preflight` summary 是 smoke / shell script 友善的固定形狀，可先確認 effective config、來源是否存在、可掃描檔案數、以及目前 runner。
+
+若缺少必要 runtime 依賴，CLI 會明確報錯，例如：
+- `Missing runtime dependency for ingest_documents CLI: qdrant_client`
+- `Local folder ingest requires --db-path or RAG_SQLITE_DB_PATH.`
 
 ### 2.2 Retrieval debug / observability
-若 retrieval 路徑需要額外診斷，可在 request/tool 層開 `include_debug=True`，回傳穩定 debug summary，例如：
-- vector candidates count
-- keyword candidates count
-- fused candidates count
-- reranked candidates count
-- `elapsed_ms`（整體 retrieval 耗時，方便 smoke 與延遲分析）
+若 retrieval 路徑需要額外診斷，可在 request/tool 層開 `include_debug=True`。目前 debug summary 除了候選數量外，也會回傳穩定的 operator-facing 結構：
+- `retrieval_summary.vector_candidates`
+- `retrieval_summary.keyword_candidates`
+- `retrieval_summary.fused_candidates`
+- `retrieval_summary.reranked_candidates`
+- `retrieval_summary.elapsed_ms`
+- `timings.prepare_queries.elapsed_ms`
+- `timings.vector_search.elapsed_ms`
+- `timings.keyword_search.elapsed_ms`
+- `timings.fusion_filter_rerank.elapsed_ms`
+- `timings.total.elapsed_ms`
+- `event`（例如 `retrieval.completed` / `operation=retrieve` / `status=ok`）
 
-這個欄位是 optional，不會改變主要 answer/result contract，但很適合 smoke、排障與延遲分析。
+這些欄位是 optional，不會改變主要 answer/result contract，但很適合 smoke、排障、與延遲分析。
 
 ### 3. LAN embedding / reranker 路徑
 如果 dense embedding 改由 OpenAI-compatible HTTP 服務提供：
@@ -231,6 +252,7 @@ export RAG_REWRITE_MODE=none
 export RAG_HISTORY_MODE=false
 export RAG_RERANKER_PROVIDER=none
 export RAG_EMBEDDING_PROVIDER=fastembed
+export RAG_RETRIEVAL_FALLBACK_MODE=lightweight
 ```
 
 安全預設為：
@@ -238,8 +260,11 @@ export RAG_EMBEDDING_PROVIDER=fastembed
 - `history_mode=false`
 - `rerank_provider=none`
 - `embedding_provider=fastembed`
+- `fallback_mode=lightweight`
 
-`scripts/run_agno_specialist.py` 會讀取這些 policy defaults，並把它們傳進 agent tool wiring；若 env 未設定或值不合法，會自動退回上述安全預設，保持 backward compatibility。
+`load_policy_from_env()` 會同時保留 requested value 與 reason（`default` / `env` / `invalid`），方便 operator 了解目前是顯式設定、未設定沿用預設、還是因非法值而回退。
+
+`scripts/run_agno_specialist.py` 與 `agno_backend_factory.py` 都會讀取這組 policy defaults；若 env 未設定或值不合法，會自動退回上述安全預設，保持 backward compatibility。
 
 目前 fallback / timeout 行為：
 - HTTP embedding 與 HTTP reranker 都會帶明確 timeout

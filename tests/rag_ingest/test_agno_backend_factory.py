@@ -103,6 +103,8 @@ def test_resolve_backend_options_from_env_exposes_optional_embedding_and_reranke
     monkeypatch.setenv('RAG_RERANKER_PROVIDER', 'http_qwen')
     monkeypatch.setenv('RAG_RERANKER_BASE_URL', 'http://localhost:8090')
     monkeypatch.setenv('RAG_RERANKER_MODEL', 'Qwen3-Reranker-0.6B')
+    monkeypatch.setenv('RAG_REWRITE_MODE', 'multi_query')
+    monkeypatch.setenv('RAG_RETRIEVAL_FALLBACK_MODE', 'none')
 
     options = resolve_backend_options_from_env()
 
@@ -113,4 +115,19 @@ def test_resolve_backend_options_from_env_exposes_optional_embedding_and_reranke
         'reranker_provider': 'http_qwen',
         'reranker_base_url': 'http://localhost:8090',
         'reranker_model': 'Qwen3-Reranker-0.6B',
+        'policy': {
+            'rewrite_mode': 'multi_query',
+            'history_mode': False,
+            'rerank_provider': 'http_qwen',
+            'embedding_provider': 'openai_compatible',
+            'fallback_mode': 'none',
+            'rewrite_requested': 'multi_query',
+            'rewrite_reason': 'env',
+            'rerank_requested': 'http_qwen',
+            'rerank_reason': 'env',
+            'embedding_requested': 'openai_compatible',
+            'embedding_reason': 'env',
+            'fallback_requested': 'none',
+            'fallback_reason': 'env',
+        },
     }

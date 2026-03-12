@@ -79,10 +79,23 @@ def test_retrieve_include_debug_returns_stable_candidate_counts():
     assert response.debug['retrieval_summary']['reranked_candidates'] == 1
 
 
-
 def test_retrieve_include_debug_adds_elapsed_ms_for_whole_call():
     response = retrieve('reset password', backend=FakeBackend(), top_k=2, include_debug=True)
 
     assert 'elapsed_ms' in response.debug['retrieval_summary']
     assert isinstance(response.debug['retrieval_summary']['elapsed_ms'], float)
     assert response.debug['retrieval_summary']['elapsed_ms'] >= 0.0
+
+
+def test_retrieve_include_debug_exposes_stage_timings_and_operator_event_shape():
+    response = retrieve('reset password', backend=FakeBackend(), top_k=2, include_debug=True)
+
+    assert response.debug['timings']['total']['elapsed_ms'] >= 0.0
+    assert response.debug['timings']['prepare_queries']['elapsed_ms'] >= 0.0
+    assert response.debug['timings']['vector_search']['elapsed_ms'] >= 0.0
+    assert response.debug['timings']['keyword_search']['elapsed_ms'] >= 0.0
+    assert response.debug['timings']['fusion_filter_rerank']['elapsed_ms'] >= 0.0
+    assert response.debug['event']['event'] == 'retrieval.completed'
+    assert response.debug['event']['operation'] == 'retrieve'
+    assert response.debug['event']['status'] == 'ok'
+    assert response.debug['event']['summary']['results_returned'] == len(response.results)

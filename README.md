@@ -167,6 +167,25 @@ PYTHONPATH=src pytest -q \
 PYTHONPATH=src:. python3 scripts/run_agno_specialist.py "what is this document about?"
 ```
 
+### 2.1 Ingestion CLI contract
+目前 repo 也提供 `scripts/ingest_documents.py` 作為 ingestion CLI 入口骨架：
+```bash
+PYTHONPATH=src:. python3 scripts/ingest_documents.py \
+  --source-path /data/docs \
+  --source-system local-folder
+```
+
+目前預設仍是安全 stub；若尚未注入實際 runner，CLI 會明確回報 wiring 尚未完成。完成 wiring 後，CLI 應輸出 JSON summary，方便後續接 shell script 或 job runner。
+
+### 2.2 Retrieval debug / observability
+若 retrieval 路徑需要額外診斷，可在 request/tool 層開 `include_debug=True`，回傳穩定 debug summary，例如：
+- vector candidates count
+- keyword candidates count
+- fused candidates count
+- reranked candidates count
+
+這個欄位是 optional，不會改變主要 answer/result contract，但很適合 smoke、排障與延遲分析。
+
 ### 3. LAN embedding / reranker 路徑
 如果 dense embedding 改由 OpenAI-compatible HTTP 服務提供：
 ```bash
@@ -183,6 +202,23 @@ export RAG_RERANKER_BASE_URL=http://192.168.1.10:8090
 export RAG_RERANKER_MODEL=Qwen/Qwen3-Reranker-0.6B
 export RAG_RERANKER_TIMEOUT_SECONDS=10
 ```
+
+### 3.1 Policy env vars
+目前 retrieval / specialist 的保守 policy defaults 可由 env 載入：
+```bash
+export RAG_REWRITE_MODE=none
+export RAG_HISTORY_MODE=false
+export RAG_RERANKER_PROVIDER=none
+export RAG_EMBEDDING_PROVIDER=fastembed
+```
+
+安全預設為：
+- `rewrite_mode=none`
+- `history_mode=false`
+- `rerank_provider=none`
+- `embedding_provider=fastembed`
+
+`scripts/run_agno_specialist.py` 會讀取這些 policy defaults，並把它們傳進 agent tool wiring；若 env 未設定或值不合法，會自動退回上述安全預設，保持 backward compatibility。
 
 目前 fallback / timeout 行為：
 - HTTP embedding 與 HTTP reranker 都會帶明確 timeout

@@ -55,6 +55,45 @@ PYTHONPATH=src pytest -q \
 PYTHONPATH=src:. python3 scripts/run_agno_specialist.py "what is this document about?"
 ```
 
+如果要先驗證 ingestion CLI contract：
+```bash
+PYTHONPATH=src:. python3 scripts/ingest_documents.py \
+  --source-path /data/docs \
+  --source-system local-folder
+```
+
+目前這個 CLI 預設仍是 stub wiring；若未接上實際 runner，會明確報錯。完成 wiring 後，預期輸出 JSON summary，方便後續 batch/job 整合。
+
+## Retrieval debug / observability
+當你要排查 retrieval 品質或延遲時，可在 retrieval request / tool path 開 `include_debug=True`。
+
+目前 debug summary 的重點是穩定 shape，而不是完整 tracing，至少會帶：
+- vector candidates count
+- keyword candidates count
+- fused candidates count
+- reranked candidates count
+
+建議：
+- smoke 驗證先關閉，保持輸出精簡
+- 排障或調參時再打開 `include_debug`
+
+## Policy defaults from env
+specialist / retrieval wiring 目前支援從 env 載入保守 policy：
+```bash
+export RAG_REWRITE_MODE=none
+export RAG_HISTORY_MODE=false
+export RAG_RERANKER_PROVIDER=none
+export RAG_EMBEDDING_PROVIDER=fastembed
+```
+
+safe defaults：
+- `rewrite_mode=none`
+- `history_mode=false`
+- `rerank_provider=none`
+- `embedding_provider=fastembed`
+
+若值不合法，會自動回退到 safe defaults，而不是把未知 policy 直接帶進 live path。
+
 ## LAN embedding path
 若 dense embedding 由 LAN 上的 OpenAI-compatible 服務提供：
 ```bash

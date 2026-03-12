@@ -50,6 +50,9 @@ def create_agno_specialist_agent(
     backend: Any,
     instructions: str | None = None,
     markdown: bool = True,
+    default_rewrite_mode: str = 'none',
+    default_history_mode: bool = False,
+    default_include_debug: bool = False,
     **kwargs: Any,
 ) -> Any:
     try:
@@ -58,7 +61,12 @@ def create_agno_specialist_agent(
         raise RuntimeError('Agno is required to create the specialist agent runtime.') from exc
 
     return Agent(
-        tools=build_agno_tools(backend=backend),
+        tools=build_agno_tools(
+            backend=backend,
+            default_rewrite_mode=default_rewrite_mode,
+            default_history_mode=default_history_mode,
+            default_include_debug=default_include_debug,
+        ),
         instructions=instructions,
         markdown=markdown,
         **kwargs,

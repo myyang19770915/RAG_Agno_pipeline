@@ -45,6 +45,16 @@ def test_run_agno_specialist_main_passes_model_and_serializes_run_output(monkeyp
             return FakeRunOutput(f'agent:{query}')
 
     monkeypatch.setattr(run_agno_specialist, 'create_backend_from_env', lambda: {'backend': 'ok'})
+    monkeypatch.setattr(
+        run_agno_specialist,
+        'load_policy_from_env',
+        lambda: {
+            'rewrite_mode': 'multi_query',
+            'history_mode': True,
+            'rerank_provider': 'none',
+            'embedding_provider': 'fastembed',
+        },
+    )
 
     def fake_create_agent(backend, **kwargs):
         captured['backend'] = backend
@@ -57,6 +67,8 @@ def test_run_agno_specialist_main_passes_model_and_serializes_run_output(monkeyp
     result = run_agno_specialist.main(query='reset password')
 
     assert captured['kwargs']['model'] == 'gpt-5-mini'
+    assert captured['kwargs']['default_rewrite_mode'] == 'multi_query'
+    assert captured['kwargs']['default_history_mode'] is True
     assert 'retrieve_knowledge' in captured['kwargs']['instructions']
     assert result['response'] == {'content': 'agent:reset password'}
     assert 'agent:reset password' in capsys.readouterr().out

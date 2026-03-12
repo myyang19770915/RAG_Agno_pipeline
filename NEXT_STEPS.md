@@ -127,6 +127,11 @@ README 應補強為：
 
 ## 2.1 正式 ingestion CLI / command
 
+### 目前進度
+- 已有 `scripts/ingest_documents.py` 作為固定入口骨架
+- 已定義 JSON summary contract
+- 尚待接上真實 ingestion runner / reindex flow
+
 ### 目的
 讓 ingest 不再只是 scattered scripts / smoke path，而是有固定入口。
 
@@ -142,6 +147,11 @@ README 應補強為：
 ---
 
 ## 2.2 Retrieval / rerank policy 明文化
+
+### 目前進度
+- 已有 env-driven policy defaults：`RAG_REWRITE_MODE`、`RAG_HISTORY_MODE`、`RAG_RERANKER_PROVIDER`、`RAG_EMBEDDING_PROVIDER`
+- `scripts/run_agno_specialist.py` 已吃到這組 policy defaults
+- `include_debug` 已可提供候選數量摘要，方便觀察 policy 效果
 
 ### 目的
 讓模型切換與排序策略可解釋、可調整。
@@ -159,6 +169,10 @@ README 應補強為：
 ---
 
 ## 2.3 Observability / logging
+
+### 目前進度
+- 已有 `timed_call(...)` 這類 lightweight timing helper
+- retrieval path 已支援 `include_debug`，可回傳 vector / keyword / fused / reranked candidate counts
 
 ### 目的
 讓未來 debug 與效能觀察更容易。

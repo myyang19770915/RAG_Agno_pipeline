@@ -6,6 +6,7 @@ import sys
 from rag_ingest.agno_backend_factory import create_backend_from_env
 from rag_ingest.agno_live_smoke import run_agno_live_smoke
 from rag_ingest.agno_runtime import create_agno_specialist_agent
+from rag_ingest.policy_config import load_policy_from_env
 
 
 DEFAULT_AGENT_INSTRUCTIONS = (
@@ -34,6 +35,7 @@ def main(query=None, argv=None):
         query = 'reset password'
 
     model_name = os.environ.get('AGNO_MODEL')
+    policy = load_policy_from_env()
     result = run_agno_live_smoke(
         query,
         backend_factory=create_backend_from_env,
@@ -41,6 +43,8 @@ def main(query=None, argv=None):
             backend=backend,
             model=model_name,
             instructions=DEFAULT_AGENT_INSTRUCTIONS,
+            default_rewrite_mode=policy['rewrite_mode'],
+            default_history_mode=policy['history_mode'],
         ),
     )
     result['response'] = _serialize_response(result['response'])

@@ -72,12 +72,17 @@ def test_retrieve_uses_backend_reranker_when_available_and_keeps_result_shape():
 def test_retrieve_include_debug_returns_stable_candidate_counts():
     response = retrieve('reset password', backend=FakeBackend(), top_k=2, include_debug=True)
 
-    assert response.debug == {
-        'rewrite_strategy': 'none',
-        'retrieval_summary': {
-            'vector_candidates': 2,
-            'keyword_candidates': 1,
-            'fused_candidates': 2,
-            'reranked_candidates': 1,
-        },
-    }
+    assert response.debug['rewrite_strategy'] == 'none'
+    assert response.debug['retrieval_summary']['vector_candidates'] == 2
+    assert response.debug['retrieval_summary']['keyword_candidates'] == 1
+    assert response.debug['retrieval_summary']['fused_candidates'] == 2
+    assert response.debug['retrieval_summary']['reranked_candidates'] == 1
+
+
+
+def test_retrieve_include_debug_adds_elapsed_ms_for_whole_call():
+    response = retrieve('reset password', backend=FakeBackend(), top_k=2, include_debug=True)
+
+    assert 'elapsed_ms' in response.debug['retrieval_summary']
+    assert isinstance(response.debug['retrieval_summary']['elapsed_ms'], float)
+    assert response.debug['retrieval_summary']['elapsed_ms'] >= 0.0

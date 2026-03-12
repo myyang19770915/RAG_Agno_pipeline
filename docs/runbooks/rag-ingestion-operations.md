@@ -62,7 +62,31 @@ PYTHONPATH=src:. python3 scripts/ingest_documents.py \
   --source-system local-folder
 ```
 
-目前這個 CLI 預設仍是 stub wiring；若未接上實際 runner，會明確報錯。完成 wiring 後，預期輸出 JSON summary，方便後續 batch/job 整合。
+CLI 也支援從 env 載入預設值，方便 smoke / cron / batch job：
+```bash
+export RAG_SOURCE_SYSTEM=local-folder
+export RAG_CHUNK_SIZE=500
+export RAG_CHUNK_OVERLAP=50
+PYTHONPATH=src:. python3 scripts/ingest_documents.py --source-path /data/docs
+```
+
+有效設定規則：
+- `--source-system` 未提供時，讀 `RAG_SOURCE_SYSTEM`
+- `--chunk-size` 未提供時，讀 `RAG_CHUNK_SIZE`，否則回退 `500`
+- `--chunk-overlap` 未提供時，讀 `RAG_CHUNK_OVERLAP`，否則回退 `50`
+
+完成 wiring 後，預期輸出 stable JSON summary，至少包含：
+- `config.source_path`
+- `config.source_system`
+- `config.chunk_size`
+- `config.chunk_overlap`
+- `preflight.source_path`
+- `preflight.source_system`
+- runner 回傳的 ingestion 結果欄位，例如 `documents_indexed`
+
+`preflight` 區塊的用途是先確認 effective config 與輸入來源，再進入真正 ingestion。這讓 CLI 更適合 shell pipeline、job runner、或 smoke 測試比對。
+
+目前這個 CLI 預設仍是 stub wiring；若未接上實際 runner，會明確報錯 `ingest_documents CLI wiring is not complete yet...`。預期行為是 fail-fast，不是吞錯或假裝完成，因此可把這個錯誤視為 preflight / wiring 未完成的訊號。
 
 ## Retrieval debug / observability
 當你要排查 retrieval 品質或延遲時，可在 retrieval request / tool path 開 `include_debug=True`。
@@ -72,10 +96,12 @@ PYTHONPATH=src:. python3 scripts/ingest_documents.py \
 - keyword candidates count
 - fused candidates count
 - reranked candidates count
+- `elapsed_ms`（整體 retrieval latency）
 
 建議：
 - smoke 驗證先關閉，保持輸出精簡
 - 排障或調參時再打開 `include_debug`
+- 若在 smoke 中看到 `elapsed_ms` 明顯飆升，先檢查外部 embedding / reranker 服務與 timeout 設定
 
 ## Policy defaults from env
 specialist / retrieval wiring 目前支援從 env 載入保守 policy：

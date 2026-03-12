@@ -1,4 +1,6 @@
-from rag_ingest.observability import timed_call
+from datetime import datetime
+
+from rag_ingest.observability import build_event, timed_call
 
 
 def test_timed_call_returns_result_and_metadata():
@@ -13,3 +15,14 @@ def test_timed_call_reports_non_negative_elapsed_ms():
     _, metadata = timed_call('fast-op', lambda: None)
 
     assert metadata['elapsed_ms'] >= 0.0
+
+
+
+def test_build_event_returns_event_timestamp_and_fields():
+    event = build_event('retrieval.completed', query='reset password', top_k=5)
+
+    assert event['event'] == 'retrieval.completed'
+    assert event['query'] == 'reset password'
+    assert event['top_k'] == 5
+    assert isinstance(event['timestamp'], str)
+    datetime.fromisoformat(event['timestamp'])

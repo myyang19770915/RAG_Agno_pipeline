@@ -175,7 +175,27 @@ PYTHONPATH=src:. python3 scripts/ingest_documents.py \
   --source-system local-folder
 ```
 
-目前預設仍是安全 stub；若尚未注入實際 runner，CLI 會明確回報 wiring 尚未完成。完成 wiring 後，CLI 應輸出 JSON summary，方便後續接 shell script 或 job runner。
+CLI 目前支援從 env 載入 smoke-friendly 預設值：
+```bash
+export RAG_SOURCE_SYSTEM=local-folder
+export RAG_CHUNK_SIZE=500
+export RAG_CHUNK_OVERLAP=50
+```
+
+若 CLI 參數省略，會使用上述 env defaults；若 env 也未設定，`chunk_size` / `chunk_overlap` 仍會回退到 `500` / `50`。
+
+完成 wiring 後，CLI 會輸出 stable JSON summary，至少包含：
+- `config.source_path`
+- `config.source_system`
+- `config.chunk_size`
+- `config.chunk_overlap`
+- `preflight.source_path`
+- `preflight.source_system`
+- runner 回傳的 ingestion 結果欄位（例如 `documents_indexed`）
+
+這個 `preflight` summary 是 smoke / shell script 友善的固定形狀，可先確認 effective config，再交由實際 runner 執行。
+
+目前預設仍是安全 stub；若尚未注入實際 runner，CLI 會明確回報 wiring 尚未完成（`ingest_documents CLI wiring is not complete yet...`），而不是靜默成功或產生半套結果。
 
 ### 2.2 Retrieval debug / observability
 若 retrieval 路徑需要額外診斷，可在 request/tool 層開 `include_debug=True`，回傳穩定 debug summary，例如：
@@ -183,6 +203,7 @@ PYTHONPATH=src:. python3 scripts/ingest_documents.py \
 - keyword candidates count
 - fused candidates count
 - reranked candidates count
+- `elapsed_ms`（整體 retrieval 耗時，方便 smoke 與延遲分析）
 
 這個欄位是 optional，不會改變主要 answer/result contract，但很適合 smoke、排障與延遲分析。
 
